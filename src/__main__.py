@@ -343,7 +343,7 @@ class MyClient(commands.Bot):
 
 def main():
     client = MyClient()
-    client.run(os.environ.get('token'))
+    client.run(os.environ.get('token'), log_handler=None)
 
 
 if __name__ == '__main__':
