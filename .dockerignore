@@ -1,0 +1,20 @@
+# flyctl launch added from .gitignore
+**\venv
+**\.env
+**\__pycache__	
+**\src\cogs\oldCogs
+**\*.pyc
+**\*.wav
+**\*.mp3
+**\*.xlsx
+**\*.html
+**\*.txt
+**\*.png
+**\*.jpeg
+**\*.jpg
+**\staticfiles
+**\db.sqlite3
+!**\requirements.txt
+!**\Img\Img_in\*
+!**\Audio\Audio_in\Chovendo\*
+!**\Audio\Audio_in\Effects\*
