@@ -3,6 +3,7 @@
 
 # Native libraries
 import os
+import sys
 import time
 import asyncio
 
@@ -226,13 +227,15 @@ class MyClient(commands.Bot):
                 print(
                     (f'[LOG]'
                      f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
-                     f'[{message}].')
+                     f'[{message}].'),
+                    file=sys.stderr,
                 )
             except Exception as e:
                 print(
                     (f'[EXCEPTION ON PRINT]'
                      f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
-                     f'[{e}].')
+                     f'[{e}].'),
+                    file=sys.stderr,
                 )
 
     async def log_command_call(self, interaction, **kwargs):
