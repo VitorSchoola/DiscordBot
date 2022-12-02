@@ -1,0 +1,8 @@
+# fly.toml file generated for foxyez-bot on 2022-12-01T20:40:02-03:00
+
+app = "foxyez-bot"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[env]
