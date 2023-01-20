@@ -1272,6 +1272,9 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             creator = self.client.aux_vars["audioInfos"][key][0]
             date = self.client.aux_vars["audioInfos"][key][1]
 
+            if (str(creator).isdigit()):
+                creator = f'<@!{creator}>'
+
             s = f'\tFound a match! [{key}]\n'
             s += f'\tCreator: {creator}\n'
             s += f'\tDate: {date}'
@@ -1544,8 +1547,8 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 self.client.dbs['db_audios'], f'{nameFile}.mp3',
                 stringAudio, f'{author.id}',
             )
-            self.client.aux_vars['audioInfos'][post.Name] = \
-                [post.Creator, post.date]
+            self.client.aux_vars['audioInfos'][post['Name']] = \
+                [post['Creator'], post['date']]
 
             await interaction.edit_original_response(
                 f"Done! Added audio [{str(nameFile)}] to our database."
