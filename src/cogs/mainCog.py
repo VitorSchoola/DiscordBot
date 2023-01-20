@@ -1456,9 +1456,13 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         author = await self.client.log_command_call(interaction, name=name)
 
+        await interaction.response.send_message(
+            "Processing...", ephemeral=False,
+        )
+
         nameFile = name.lower()
         if (nameFile + '.mp3' in self.client.aux_vars['audioInfos'].keys()):
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 "Audio name already in use!", ephemeral=True,
             )
             await self.client.log("\tAudio name already in use!")
@@ -1469,7 +1473,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         elif link:
             selected_url = link
         else:
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 content='No audio received.',
                 ephemeral=True,
             )
@@ -1491,7 +1495,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             img=False,
         )
         if (errorCode != 0):  # Returned error
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 content=errorMess, ephemeral=True,
             )
             await self.client.log(f'{errorMess}')
@@ -1509,7 +1513,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         # Confirmação de áudio
         if (res == -1):
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 "Invalid audio. Did you send an audio file?.",
                 ephemeral=True,
             )
@@ -1518,7 +1522,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
         elif (res == -2):
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 "Invalid audio. It's more than 7 seconds long.",
                 ephemeral=True
             )
@@ -1543,7 +1547,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             self.client.aux_vars['audioInfos'][post.Name] = \
                 [post.Creator, post.date]
 
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 f"Done! Added audio [{str(nameFile)}] to our database."
             )
             await self.client.log(
