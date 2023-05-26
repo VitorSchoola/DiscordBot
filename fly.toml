@@ -1,9 +1,12 @@
-# fly.toml file generated for foxyez-bot on 2022-12-01T20:40:02-03:00
+# fly.toml app configuration file generated for foxyez-bot on 2023-05-26T16:35:10-03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = "foxyez-bot"
+primary_region = "lax"
 kill_signal = "SIGINT"
-kill_timeout = 5
-processes = []
+kill_timeout = "5s"
 
 [env]
   APP_ENV = "production"
