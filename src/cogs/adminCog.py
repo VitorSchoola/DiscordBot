@@ -113,7 +113,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         await interaction.response.send_message(
             f'\tGoodbye!.', ephemeral=True,
         )
-        await self.client.close()
+        await self.client.close(-1)
 
     @admin_group.command(
         name='fix',
