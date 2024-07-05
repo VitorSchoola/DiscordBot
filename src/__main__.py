@@ -243,6 +243,8 @@ class MyClient(commands.Bot):
             author = interaction.user
         elif isinstance(interaction, commands.Context):
             author = interaction.author
+        else:
+            author = interaction.user
 
         admin = await self.validate_admin(interaction)
         admin_str = "[ADMIN]" * admin

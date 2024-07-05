@@ -22,7 +22,7 @@ from pydub import AudioSegment
 from gtts import gTTS
 
 # Etc.
-from fuzzywuzzy import fuzz
+from thefuzz import fuzz
 
 from googletrans import Translator
 
@@ -44,26 +44,33 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
     def handle_link(
         self, link: str,
-        max_mb: int = 1, list_extensions: list = ['.wav', '.mp3'],
-        img=True,
+        max_mb: int = 1, list_extensions=[],
+        img=True, default_name_file=None,
     ):
         # Check if a link was sent
-        if ((link is not None) and (link != '')):
-            r = requests.get(link)
-            if ('content-disposition' in r.headers.keys()):
-                d = r.headers['content-disposition']
-                nomeArq = re.findall("filename=(.+)", d)[0]
-            else:
-                nomeArq = link.split("/")[-1]
-        else:
+        if ((link is None) or (link == '')):
             return (-2, 'No file found at link', None)
+
+        # Get file name from link if none was provided
+        r = requests.get(link)
+        if default_name_file:
+            nomeArq = default_name_file
+        else:
+            try:
+                if ('content-disposition' in r.headers.keys()):
+                    d = r.headers['content-disposition']
+                    nomeArq = re.findall("filename=(.+)", d)[0]
+                else:
+                    nomeArq = link.split("/")[-1]
+            except:
+                return (-1, f'Couldnt resolve filetype', None)
 
         # Checks if file is less than max_mb MB
         length = int(r.headers.get('Content-Length', 0))
         if length > max_mb * 1024 * 1024:
             return (-3, f'File is larger than {max_mb}', None)
 
-        # Saves to auxiliary imgs folder
+        # Saves to auxiliary folder
         if img:
             nomeArq = f'Img/Img_aux/{nomeArq}'
         else:
@@ -75,7 +82,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             with open(nomeArq, 'wb') as f:
                 f.write(r.content)
         except Exception as e:
-            return (-4, f'I couldn\'t save the audio file. [{e}]', None)
+            return (-4, f'I couldn\'t save the file. [{e}]', None)
 
         if (nomeArq.split('.')[-1] not in list_extensions):
             os.remove(nomeArq)
@@ -278,6 +285,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         songDif = song.dBFS + limit
         song = song - songDif
         song.export(str(fileName), format="mp3")
+        print('Done')
         return 0
 
     async def process_audio(
@@ -289,7 +297,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         if (pitch_change != 0):
             pitch_change = float(pitch_change) * 0.1
             if (pitch_change < -1) or (pitch_change > 1):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     ("Invalid pitch number. \n"
                      "```Use numbers between -10 and 10 for <pitch_change>```")
                 )
@@ -474,11 +482,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 )
 
         if len(embeds) != 0:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embeds=embeds, ephemeral=True
             )
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Nothing found', ephemeral=True
             )
 
@@ -500,6 +508,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log_command_call(
             interaction, command_name=command_name,
         )
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         # Access validations
         validated_admin = await self.client.validate_admin(interaction)
@@ -594,11 +603,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                                   colour=0xAA89FF, description=''))
 
         if len(embeds) != 0:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embeds=embeds, ephemeral=hidden,
             )
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'No command found', ephemeral=True,
             )
             await self.client.log(
@@ -621,9 +630,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         author = await self.client.log_command_call(
             interaction, message=message
         )
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
+
         ping = self.client.latency
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=(f'Hey, <@!{str(author.id)}>\n'
                      f'Pong! [{str(ping*1000)}ms]\n'
                      f'You wrote: {str(message)}'),
@@ -647,40 +658,47 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         hidden: Optional[bool] = True,
     ):
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         if attach:
             selected_url = attach.url
+            default_name_file = attach.filename
+            file_type = attach.content_type
         elif link:
             selected_url = link
+            default_name_file = None
+            file_type = None
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content='No image received.',
                 ephemeral=True,
             )
             await self.client.log('\tNo image received.')
             return
 
-        # Validation and download of file
-        listExtensions = ['png', 'jpg', 'gif', 'jpeg', 'tiff']
-        (errorCode, errorMess, nomeArq) = self.handle_link(
-            selected_url, max_mb=5, list_extensions=listExtensions,
-        )
+        # Download of file
+        list_extensions = ['png', 'jpg', 'gif', 'jpeg', 'tiff']
+        try:
+            (errorCode, errorMess, nomeArq) = self.handle_link(
+                selected_url, max_mb=5, default_name_file=default_name_file, list_extensions=list_extensions,
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                content=f'Couldn\'t handle file. 😔 [{e}]',
+                ephemeral=True,
+            )
         if (errorCode != 0):  # Returned error
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content=errorMess,
                 ephemeral=True,
             )
             await self.client.log(f'{errorMess}')
             return
 
-        await interaction.response.send_message(
-            'Processing...', ephemeral=hidden
-        )
-
         # Obtem as linhas ASCII art da imagem
         lines = Img2Ascii.ImgToAscii(nomeArq)
 
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             f"||{lines[0]}||"
         )
 
@@ -706,6 +724,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         """<a> [b] - Gets a random integer between <a> and [b];
          if b is not given, it's set as 0;"""
         author = await self.client.log_command_call(interaction, a=a, b=b)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         smaller = min(a, b)
         bigger = max(a, b)
@@ -714,11 +733,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         try:
             aleatorio = random.randint(smaller, bigger)
         except Exception as e:
-            await interaction.response.send_message("Invalid numbers to roll.")
+            await interaction.followup.send("Invalid numbers to roll.")
             await self.client.log(f"\tRoll raised exception. [{e}]")
             return
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"{author} rolled {aleatorio}. 🎲 (Range was {smaller}~{bigger})",
             ephemeral=hidden,
         )
@@ -735,6 +754,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """- O prato é caro, loro;"""
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=False, thinking=True)
 
         embed = discord.Embed(
             type='rich',
@@ -745,7 +765,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         embed.set_image(url='https://i.imgur.com/GNQjcxE.png')
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed, ephemeral=False,
         )
         await self.client.log(f"\tDone.")
@@ -765,18 +785,15 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """<question> - Asks wolfram your question;"""
         await self.client.log_command_call(interaction, question=question)
-
-        await interaction.response.send_message(
-            'Processing...', ephemeral=hidden
-        )
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         try:
             res = self.client.aux_vars['wolfram'].query(question)
             answer = next(res.results).text
-            await interaction.edit_original_response(answer)
+            await interaction.followup.send(answer)
             await self.client.log(f"'\tQuery [{question}] returned [{answer}]")
         except Exception as e:
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 "I wasn't able to complete your request.",
             )
             await self.client.log(
@@ -799,6 +816,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """\"<message>\" - Creates a Dota+ hot tip;"""
         await self.client.log_command_call(interaction, message=message)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         await self.client.log(f'\tMessage: [{message}]')
 
@@ -807,7 +825,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         with open(newImage, 'rb') as fp:
             file = discord.File(fp, filename='virus_cavalodetroia.png')
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 file=file, ephemeral=hidden,
             )
 
@@ -828,6 +846,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         hidden: Optional[bool] = False,
     ):
         await self.client.log_command_call(interaction, message=message)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         await self.client.log(f'\tMessage: [{message}]')
 
@@ -843,7 +862,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         with open(newImage, 'rb') as fp:
             file = discord.File(fp, filename='virus_destroi_compiuter.png')
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 file=file, ephemeral=hidden,
             )
 
@@ -868,24 +887,21 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log_command_call(
             interaction, term=term, simple=simple
         )
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         if (term == ""):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Empty term.", ephemeral=True
             )
             await self.client.log(f"\tEmpty term.")
             return
-
-        await interaction.response.send_message(
-            "Processing...", ephemeral=hidden,
-        )
 
         if simple:
             (content, img, page) = getWiki.getWikiSimple(term, 5)
         else:
             (content, img, page) = getWiki.getWiki(term, 5)
         if (content == -1):
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 "I didn't find any page. Sorry. 🥲",
             )
             await self.client.log(f"\tNo page found. Query:[{term}].")
@@ -902,7 +918,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         if (img is not None):
             embed.set_image(url=img)
 
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             embed=embed,
         )
         await self.client.log(
@@ -925,6 +941,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         self, interaction: discord.Interaction,
     ):
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         urlBreeds = 'https://dog.ceo/api/breeds/list/all'
         dataBreeds = requests.get(urlBreeds).json()
@@ -939,7 +956,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             colour=0xFF0596, description=s,
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed, ephemeral=True,
         )
         await self.client.log("\tDog list shown.")
@@ -960,6 +977,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         hidden: Optional[bool] = True,
     ):
         await self.client.log_command_call(interaction, breed=breed)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         # Removes spaces, because the database
         # doesn't have spaces for dog breeds
@@ -996,14 +1014,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         try:
             embed.set_image(url=data['message'])
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content='Sorry, I couldn\'t find a dog... 🐩',
                 ephemeral=hidden,
             )
             await self.client.log(f"\tDog broken. [{e}]")
             return
 
-        await interaction.response.send_message(embed=embed, ephemeral=hidden)
+        await interaction.followup.send(embed=embed, ephemeral=hidden)
         await self.client.log("\tDog shown.")
         return
 
@@ -1022,6 +1040,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         self, interaction: discord.Interaction,
     ):
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         urlBreeds = 'https://api.thecatapi.com/v1/breeds'
         dataBreeds = requests.get(urlBreeds).json()
@@ -1034,7 +1053,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             colour=0xFF0596, description=s,
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed, ephemeral=True,
         )
         await self.client.log("\tCat list shown.")
@@ -1055,6 +1074,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         hidden: Optional[bool] = True,
     ):
         await self.client.log_command_call(interaction, breed=breed)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         breed = breed.lower()
 
@@ -1099,14 +1119,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         try:
             embed.set_image(url=data[0]['url'])
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content='Sorry, I couldn\'t find a cat... 🐈‍⬛',
                 ephemeral=hidden,
             )
             await self.client.log(f"\tCat broken. [{e}]")
             return
 
-        await interaction.response.send_message(embed=embed, ephemeral=hidden)
+        await interaction.followup.send(embed=embed, ephemeral=hidden)
         await self.client.log("\tCat shown.")
         return
 
@@ -1123,10 +1143,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """- Plays a random \"CHOVENDO\" audio from the audio list;"""
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         channel = self.client.get_channel(interaction)
 
         if (channel is None):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'You\'re not in a voice channel.', ephemeral=True,
             )
             await self.client.log("\tNot in a voice channel")
@@ -1141,7 +1162,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 name=audioname, variableTag='Name',
             )
             if (res is None):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     'Unexpected error when obtaining audio.',
                     ephemeral=True,
                 )
@@ -1157,7 +1178,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log(
             f"\tPlayed [Audio/Audio_in/Chovendo/{audioname}]."
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             'Playing audio', ephemeral=True,
         )
 
@@ -1173,12 +1194,13 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         who: str,
     ):
         await self.client.log_command_call(interaction, who=who)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         channel = self.client.get_channel(interaction)
 
         try:
             tts = gTTS(text=who, lang='pt', slow=False)
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Problem connecting to Google\'s TTS API. Try again later.',
                 ephemeral=True,
             )
@@ -1205,14 +1227,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         audio.export("Audio/Audio_aux/Cebolitos.mp3", format="mp3")
 
         if (channel is None):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'You\'re not in a voice channel.', ephemeral=True,
             )
             await self.client.log("\tNot in a voice channel")
             return
 
         await self.playAudio(channel, 'Audio/Audio_aux/Cebolitos.mp3')
-        await interaction.response.send_message(
+        await interaction.followup.send(
             'Playing audio', ephemeral=True,
         )
 
@@ -1235,6 +1257,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         hidden: Optional[bool] = True,
     ):
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         listing = [
             '.'.join(item.split('.')[:-1]).lower()
@@ -1248,7 +1271,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 s += f'{listing[i]}\n'
         s += "```"
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             s,
             ephemeral=hidden,
         )
@@ -1291,6 +1314,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log_command_call(
             interaction, name=name, how_many=how_many
         )
+        await interaction.response.defer(ephemeral=hidden, thinking=True)
 
         ratios = []
         for key in self.client.aux_vars['audioInfos'].keys():
@@ -1306,11 +1330,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             embeds.append(embed)
 
         if len(embeds) != 0:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embeds=embeds, ephemeral=hidden,
             )
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'No audio found', ephemeral=hidden,
             )
 
@@ -1332,13 +1356,18 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         voice channel. Uses link if provided,
         or attached file if link is not provided;"""
         author = await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if attach:
             selected_url = attach.url
+            default_name_file = attach.filename
+            file_type = attach.content_type
         elif link:
             selected_url = link
+            default_name_file = None
+            file_type = None
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content='No audio received.',
                 ephemeral=True,
             )
@@ -1355,33 +1384,40 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             "rm", "raw", "rf64", "sln", "tta", "voc",
             "vox", "wav", "wma", "wv", "webm", "8svx", "cda",
         ]
-        (errorCode, errorMess, nomeArq) = self.handle_link(
-            selected_url, max_mb=1, list_extensions=listExtensions,
-            img=False,
-        )
+        try:
+            (errorCode, errorMess, nomeArq) = self.handle_link(
+                selected_url, max_mb=1, list_extensions=listExtensions, default_name_file=default_name_file,
+                img=False,
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                content=f'Couldn\'t handle file. 😔 [{e}]',
+                ephemeral=True,
+            )
         if (errorCode != 0):  # Returned error
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content=errorMess, ephemeral=True
             )
             await self.client.log(f'\t{errorMess}')
             return
 
         # Checks if the audio is valid and puts it's peak volume at -30dB
+        await self.client.log('Authenticating audio')
         res = self.authAudio(
             originalFile=nomeArq,
             fileName=f"Audio/Users/{author.id}.mp3",
             limit=30, max_secs=5
         )
 
-        self.client.log('Authenticated audio')
 
+        await self.client.log('Authenticated audio')
         if nomeArq != f"Audio/Users/{author.id}.mp3":
-            self.client.log('Removing previous audio from folder')
+            await self.client.log('Removing previous audio from folder')
             os.remove(nomeArq)
 
         # Confirmação de áudio
         if (res == -1):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content="Invalid audio. Is it an audio file?",
                 ephemeral=True,
             )
@@ -1390,7 +1426,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
         elif (res == -2):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content="Invalid audio. It's more than 5 seconds long.",
                 ephemeral=True,
             )
@@ -1399,21 +1435,21 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
         else:
-            self.client.log('Converting audio to string')
+            await self.client.log('Converting audio to string')
             stringAudio = usersAudioManager.convertAudioToString(
                 f"Audio/Users/{author.id}.mp3"
             )
-            self.client.log('Deleting previous audio from db')
+            await self.client.log('Deleting previous audio from db')
             usersAudioManager.deleteFromDb(
                 self.client.dbs['db_users'], f'{str(author.id)}.mp3'
             )
-            self.client.log('Adding new audio to db')
+            await self.client.log('Adding new audio to db')
             usersAudioManager.addToDb(
                 self.client.dbs['db_users'], f'{str(author.id)}.mp3',
                 stringAudio, nameUser=str(author),
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content='Done!', ephemeral=True,
             )
             await self.client.log("\tDone")
@@ -1427,13 +1463,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         self, interaction: discord.Interaction,
     ):
         author = await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if (
             usersAudioManager.deleteFromDb(
                 self.client.dbs['db_users'], f'{author.id}.mp3'
             )
         ):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "You didn't have an audio 😘",
                 ephemeral=True,
             )
@@ -1441,7 +1478,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             return
         else:
             os.remove(f'Audio/Users/{author.id}.mp3')
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "You were removed from the audio list. We'll miss you! 🥲",
                 ephemeral=True,
             )
@@ -1464,14 +1501,11 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         link: Optional[str] = None,
     ):
         author = await self.client.log_command_call(interaction, name=name)
-
-        await interaction.response.send_message(
-            "Processing...", ephemeral=False,
-        )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         nameFile = name.lower()
         if (nameFile + '.mp3' in self.client.aux_vars['audioInfos'].keys()):
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 "Audio name already in use!", ephemeral=True,
             )
             await self.client.log("\tAudio name already in use!")
@@ -1479,10 +1513,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         if attach:
             selected_url = attach.url
+            default_name_file = attach.filename
+            file_type = attach.content_type
         elif link:
             selected_url = link
+            default_name_file = None
+            file_type = None
         else:
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 content='No audio received.',
                 ephemeral=True,
             )
@@ -1499,12 +1537,18 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             "rm", "raw", "rf64", "sln", "tta", "voc",
             "vox", "wav", "wma", "wv", "webm", "8svx", "cda"
         ]
-        (errorCode, errorMess, nomeArq) = self.handle_link(
-            selected_url, max_mb=2, list_extensions=listExtensions,
-            img=False,
-        )
+        try:
+            (errorCode, errorMess, nomeArq) = self.handle_link(
+                selected_url, max_mb=2, list_extensions=listExtensions, default_name_file=default_name_file,
+                img=False,
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                content=f'Couldn\'t handle file. 😔 [{e}]',
+                ephemeral=True,
+            )
         if (errorCode != 0):  # Returned error
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 content=errorMess, ephemeral=True,
             )
             await self.client.log(f'{errorMess}')
@@ -1522,7 +1566,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         # Confirmação de áudio
         if (res == -1):
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 "Invalid audio. Did you send an audio file?.",
                 ephemeral=True,
             )
@@ -1531,7 +1575,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
         elif (res == -2):
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 "Invalid audio. It's more than 7 seconds long.",
                 ephemeral=True
             )
@@ -1556,7 +1600,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             self.client.aux_vars['audioInfos'][post['Name']] = \
                 [post['Creator'], post['date']]
 
-            await interaction.edit_original_response(
+            await interaction.followup.send(
                 f"Done! Added audio [{str(nameFile)}] to our database."
             )
             await self.client.log(
@@ -1576,6 +1620,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         name: str,
     ):
         author = await self.client.log_command_call(interaction, name=name)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         nameFile = name.lower() if name.endswith('.mp3') \
             else f'{name.lower()}.mp3'
@@ -1590,7 +1635,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 and self.client.aux_vars['audioInfos'][nameFile]['Creator']
                 != author.id
             ):
-                interaction.response.send_message(
+                interaction.followup.send(
                     "You can't delete this audio", ephemeral=True,
                 )
                 await self.client.log("\tYou can't delete this audio")
@@ -1608,7 +1653,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             self.client.aux_vars['audioInfos'].pop(nameFile, None)
 
-            await interaction.response.send_message("Done!")
+            await interaction.followup.send("Done!")
             await self.client.log(f'\tDone. Removed {nameFile}')
 
     @audio_group.command(
@@ -1638,6 +1683,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             interaction, audio_name=audio_name, pitch_change=pitch_change,
             wacky=wacky, reverse=reverse, random=random, user=user,
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if (audio_name == '' and random is False and user is None):
             await self.client.log('\tNo input. Playing random audio.')
@@ -1646,7 +1692,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         # Gets channel
         channel = self.client.get_channel(interaction)
         if (channel is None):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "You're not in a voice channel.",
                 ephemeral=True,
             )
@@ -1660,7 +1706,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 self.client.dbs['db_audios']
             ).lower()[:-4]
             if (audio_name == -1):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     'Unexpected error when obtaining audio.',
                     ephemeral=True,
                 )
@@ -1678,7 +1724,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             # Check if audio exists
             audio_name = f'{audio_name}.mp3'.lower()
             if (audio_name not in self.client.aux_vars['audioInfos'].keys()):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f"Sorry, no audio named '{audio_name}' was found.",
                     ephemeral=True,
                 )
@@ -1695,7 +1741,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
 
         if not downloaded_file:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Error downloading file. Does it exist?",
                 ephemeral=True,
             )
@@ -1725,14 +1771,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
 
         if res == -1:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Error processing audio', ephemeral=True,
             )
             await self.client.log('\tError processing audio')
             return
 
         await self.playAudio(channel, f'Audio/Audio_aux/{audio_name}')
-        await interaction.response.send_message(
+        await interaction.followup.send(
             'Done!', ephemeral=True,
         )
         await self.client.log('\tDone!')
@@ -1768,11 +1814,12 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             interaction, message=message, language=language,
             pitch_change=pitch_change, wacky=wacky, reverse=reverse,
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         # Gets channel
         channel = self.client.get_channel(interaction)
         if (channel is None):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "You're not in a voice channel.",
                 ephemeral=True,
             )
@@ -1801,7 +1848,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         try:
             tts = gTTS(text=message, lang=language, slow=False)
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Problem connecting to Google\'s TTS API. Try again later.',
                 ephemeral=True
             )
@@ -1826,14 +1873,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
 
         if res == -1:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Error processing audio', ephemeral=True,
             )
             await self.client.log('\tError processing audio')
             return
 
         await self.playAudio(channel, 'Audio/Audio_aux/pTTS.mp3')
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f'{"[Assuming language]"*approx_lang} Playing audio in {language}',
             ephemeral=True,
         )
@@ -1866,6 +1913,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             language_from=language_from, language_to=language_to,
             pitch_change=pitch_change, wacky=wacky, reverse=reverse,
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         language_from = language_from.lower()
         language_to = language_to.lower()
@@ -1915,7 +1963,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 message, src=src_key, dest=dst_key
             )
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Problem connecting to Google\'s translation API.',
                 ephemeral=True,
             )
@@ -1939,7 +1987,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         # Message already translated, if not "say_it", we're done
         if not say_it:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 msg,
                 ephemeral=False,
             )
@@ -1949,7 +1997,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         channel = self.client.get_channel(interaction)
 
         if (channel is None):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{msg}\nYou're not in a voice channel!",
                 ephemeral=False,
             )
@@ -1960,7 +2008,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         try:
             tts = gTTS(text=translation.text, lang=language_to, slow=False)
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 (f'{msg}\n'
                  'Problem connecting to Google\'s TTS API. Try again later.'),
                 ephemeral=False,
@@ -1986,14 +2034,14 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
 
         if res == -1:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 'Error processing audio', ephemeral=True,
             )
             await self.client.log('\tError processing audio')
             return
 
         await self.playAudio(channel, 'Audio/Audio_aux/pTranslateTTS.mp3',)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f'{msg}\nDone"',
             ephemeral=False,
         )
@@ -2011,6 +2059,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """- Don't use this command 🐼;"""
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=False, thinking=True)
 
         posts = self.client.dbs['db_users'].posts
         query = {"tag": "counterPharmercy"}
@@ -2037,7 +2086,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         embed.set_image(url=url)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed,
         )
         await self.client.log(f"\tDone!")
@@ -2056,6 +2105,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         author = await self.client.log_command_call(
             interaction, person=person.id
         )
+        await interaction.response.defer(ephemeral=False, thinking=True)
 
         counterName = str(person.id)
 
@@ -2076,7 +2126,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             counter, 'God_Counter',
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=('https://cdn.discordapp.com/attachments/'
                      '183784872114913280/796554042187710494/'
                      'mercy.jpg\n'
@@ -2108,6 +2158,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         author = await self.client.log_command_call(
             interaction, variable=variable
         )
+        await interaction.response.defer(ephemeral=False, thinking=True)
 
         variable = variable.lower()
 
@@ -2120,7 +2171,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         else:
             counter = 0
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=(f'Hey, <@!{author.id}>\n'
                      f'Counter [{variable.capitalize()}]: {counter}'),
             ephemeral=False,
@@ -2144,6 +2195,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         author = await self.client.log_command_call(
             interaction, variable=variable, number=number
         )
+        await interaction.response.defer(ephemeral=False, thinking=True)
 
         variable = variable.lower()
 
@@ -2164,7 +2216,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             counter, 'Variable_Counter',
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=(f'Hey, <@!{author.id}>\n'
                      f'Counter [{variable.capitalize()}]: {counter}'),
             ephemeral=False,
@@ -2188,6 +2240,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         author = await self.client.log_command_call(
             interaction, variable=variable, number=number
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         variable = variable.lower()
 
@@ -2208,7 +2261,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             counter, 'Variable_Counter',
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=(f'Hey, <@!{str(author.id)}>\n'
                      f'Counter [{str(variable).capitalize()}]: {counter}'),
             ephemeral=True,
@@ -2235,6 +2288,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     ):
         """- Lists all currencies;"""
         await self.client.log_command_call(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
             last_update = self.client.aux_vars['converter'].lastUpdate
@@ -2246,7 +2300,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 or seconds_since > 3600):
             self.client.aux_vars['converter'] = getCurrency.CurrencyConverter()
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embeds=self.client.aux_vars['converter'].embedsOfCurrencies,
             ephemeral=True,
         )
@@ -2271,6 +2325,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log_command_call(
             interaction, source=source, dest=dest, value=value
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         source = source.upper()
         dest = dest.upper()
@@ -2320,28 +2375,12 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         embed.set_image(url='https://i.imgur.com/8XhBzhx.png')
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embeds=[embed], ephemeral=False,
         )
         await self.client.log(
             f'\t{value} {source} = {converted_value} {dest}'
         )
-
-    # # UI of commands # #
-    # @discord.app_commands.command(name='dog', description=('Shows a doggo'))
-    # async def dog_ui(self, interaction: discord.Interaction):
-    #     items = [
-    #         {
-    #             'label': 'breed', 'placeholder': 'Dog breed',
-    #             'variableName': 'breed',
-    #         },
-    #     ]
-    #     await interaction.response.send_modal(
-    #         self.client.Questionnaire(
-    #             title='Dog Function',
-    #             items=items, on_submit_func=self.dog_function
-    #         )
-    #     )
 
 
 async def setup(client):

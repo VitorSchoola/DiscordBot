@@ -3,7 +3,7 @@ import datetime
 
 import discord
 
-from fuzzywuzzy import process
+from thefuzz import process
 
 
 class CurrencyConverter():
