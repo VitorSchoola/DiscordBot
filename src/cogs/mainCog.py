@@ -1373,7 +1373,10 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             limit=30, max_secs=5
         )
 
+        self.client.log('Authenticated audio')
+
         if nomeArq != f"Audio/Users/{author.id}.mp3":
+            self.client.log('Removing previous audio from folder')
             os.remove(nomeArq)
 
         # Confirmação de áudio
@@ -1396,12 +1399,15 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
         else:
+            self.client.log('Converting audio to string')
             stringAudio = usersAudioManager.convertAudioToString(
                 f"Audio/Users/{author.id}.mp3"
             )
+            self.client.log('Deleting previous audio from db')
             usersAudioManager.deleteFromDb(
                 self.client.dbs['db_users'], f'{str(author.id)}.mp3'
             )
+            self.client.log('Adding new audio to db')
             usersAudioManager.addToDb(
                 self.client.dbs['db_users'], f'{str(author.id)}.mp3',
                 stringAudio, nameUser=str(author),
