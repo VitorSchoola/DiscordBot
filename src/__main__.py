@@ -7,6 +7,8 @@ import sys
 import time
 import asyncio
 import logging
+import io
+import subprocess
 
 # Discord
 import discord
@@ -262,6 +264,19 @@ class MyClient(commands.Bot):
         else:
             await self.log(f"An unexpected error occurred: `{error}`")
 
+    async def buffer_audio(self, path: str) -> io.BytesIO:
+        """Convert audio to opus in memory for fast playback (cross-platform)."""
+        def run_ffmpeg():
+            return subprocess.run(
+                ["ffmpeg", "-i", path, "-f", "opus", "pipe:1"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True
+            ).stdout
+
+        data = await asyncio.to_thread(run_ffmpeg)
+        return io.BytesIO(data)
+
     # Event on_voice_state_update
     async def on_voice_state_update(self, member, before, after):
         authorFile = f'{str(member.id)}.mp3'
@@ -287,8 +302,10 @@ class MyClient(commands.Bot):
             await self.log(f'\tIt triggered a sound.')
 
             await self.log(f'\tOpening "{authorFile}".')
-            source = discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}')
-            source.read() # This will take some seconds
+            # Pre-buffer the file in memory (async, non-blocking)
+            buf = await self.buffer_audio(f'Audio/Users/{authorFile}')
+            buf.seek(0)
+            source = discord.FFmpegOpusAudio(buf, pipe=True)
             
             try:
                 voiceClient = await after.channel.connect(timeout=5)
