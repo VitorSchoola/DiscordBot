@@ -292,11 +292,10 @@ class MyClient(commands.Bot):
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
-            await asyncio.sleep(1)
-
             await self.log(f'\tOpening "{authorFile}".')
-
-            voiceClient.play(discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}'))
+            source = discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}')
+            source.read() # This will take some seconds
+            voiceClient.play(source)
 
             await self.audioDisconnect(voiceClient)
 

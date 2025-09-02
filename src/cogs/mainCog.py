@@ -341,7 +341,9 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             await asyncio.sleep(1)
 
             await self.client.log(f'\tPlaying "{file}" inside channel.')
-            voiceClient.play(discord.FFmpegOpusAudio(file))
+            source = discord.FFmpegPCMAudio(file)
+            source.read() # This will take some seconds
+            voiceClient.play(source)
             await self.client.audioDisconnect(voiceClient)
             return voiceClient
         else:

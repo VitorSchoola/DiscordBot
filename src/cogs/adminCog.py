@@ -294,6 +294,6 @@ async def setup(client):
         guild=guild,
     )
 
-    await client.log(f'\tSyncing tree {guild.name} [{guild.id}].')
-    synced = await client.tree.sync(guild=guild)
-    await client.log(f"\tSynced {len(synced)} command(s).")
+    # await client.log(f'\tSyncing tree {guild.name} [{guild.id}].')
+    # synced = await client.tree.sync(guild=guild)
+    # await client.log(f"\tSynced {len(synced)} command(s).")
