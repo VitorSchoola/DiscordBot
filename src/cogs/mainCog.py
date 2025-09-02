@@ -338,7 +338,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 return
 
             voiceClient.play(
-                discord.FFmpegPCMAudio(file),
+                discord.FFmpegOpusAudio(file),
                 after=lambda e: self.client.audioDisconnect(voiceClient),
             )
             await self.client.log(f'\tPlaying "{file}" inside channel.')

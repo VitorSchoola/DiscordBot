@@ -28,51 +28,8 @@ if platform.system() == 'Windows':
 from dotenv import load_dotenv
 load_dotenv(encoding='latin-1')
 
-
 # Client class
 class MyClient(commands.Bot):
-    class Questionnaire(discord.ui.Modal):
-        def __init__(
-            self, on_submit_func, title='Basic Title',
-            items=[{'label': 'Name', 'placeholder': 'Your name here'}]
-        ):
-            super().__init__(
-                title=title,
-            )
-
-            self.callback_submit_func = on_submit_func
-
-            self.items = {}
-            for item in items:
-                self.items[item['variableName']] = discord.ui.TextInput(
-                    label=item['label'].capitalize(),
-                    placeholder=item['placeholder'],
-                    required=item['required'] if 'required' in item.keys()
-                    else False,
-                )
-
-                self.add_item(self.items[item['variableName']])
-
-        async def on_submit(
-            self, interaction: discord.Interaction
-        ):
-            items = self.items.items()
-            variables_values = {key: value.value for (key, value) in items}
-            await self.callback_submit_func(
-                author=interaction.user,
-                sendWith=interaction.response.send_message,
-                variables=variables_values
-            )
-
-        async def on_error(
-            self, error: Exception, interaction: discord.Interaction
-        ) -> None:
-            import traceback
-            await interaction.response.send_message(
-                'Oops! Something went wrong.', ephemeral=True
-            )
-            traceback.print_tb(error.__traceback__)
-
     # Enviroment variables and auxiliary variables
     def __init__(self, *args, **kwargs):
         intents = discord.Intents.default()
@@ -173,30 +130,6 @@ class MyClient(commands.Bot):
         stringS += ("_________________________________"
                     "_________________________________")
         await self.log(stringS)
-
-        try:
-            await self.log('\tSyncing tree [GLOBAL].')
-            await self.tree.sync()
-        except discord.HTTPException as e:
-            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
-        except discord.CommandSyncFailure as e:
-            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
-        except discord.Forbidden as e:
-            await self.log(f'Invalid permissions for tree [GLOBAL]. {e}')
-
-        # Tries to sync tree commands for all guilds on startup
-        for guild in self.guilds:
-            try:
-                await self.log(f'\tSyncing tree {guild.name} [{guild.id}].')
-                await self.tree.sync(guild=guild)
-            except discord.HTTPException:
-                await self.log(
-                    f'\tCouldn\'t sync tree {guild.name} [{guild.id}]'
-                )
-            except discord.Forbidden:
-                await self.log(
-                    f'Invalid permissions for tree {guild.name} [{guild.id}]'
-                )
 
         await self.change_presence(
             activity=discord.Activity(
@@ -316,6 +249,12 @@ class MyClient(commands.Bot):
         authorFile = f'{str(member.id)}.mp3'
 
         if (after.channel is not None and before.channel is None):
+            if member.id == self.user.id:
+                await self.log(
+                    f'\tI entered {str(after.channel)}.'
+                )
+                return
+
             await self.log(
                 f'{member.name} ({member.id}) entered {str(after.channel)}.'
             )
@@ -330,13 +269,13 @@ class MyClient(commands.Bot):
             await self.log(f'\tIt triggered a sound.')
 
             try:
-                voiceClient = await after.channel.connect()
+                voiceClient = await after.channel.connect(timeout=5, reconnect=False, self_deaf=True)
             except Exception as e:
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
             voiceClient.play(
-                discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}'),
+                discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}'),
                 after=lambda _: self.audioDisconnect(voiceClient),
             )
 

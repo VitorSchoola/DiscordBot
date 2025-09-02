@@ -5,9 +5,10 @@ from typing import Optional
 
 
 class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
-    def __init__(self, client):
+    def __init__(self, client, admin_guild):
         super().__init__()
         self.client = client
+        self.admin_guild = admin_guild
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error):
@@ -113,7 +114,49 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         await interaction.response.send_message(
             f'\tGoodbye!.', ephemeral=True,
         )
-        await self.client.close(-1)
+        await self.client.close()
+
+    @admin_group.command(
+        name="sync",
+        description='Syncs all cogs'
+    )
+    @discord.app_commands.describe(
+    )
+    async def sync(self, interaction: discord.Interaction):
+        if not (await self.client.validate_admin(interaction)):
+            await self.client.log('\tAccess denied.')
+            return
+
+        try:
+            await self.client.log('\tSyncing tree [GLOBAL].')
+            synced = await self.client.tree.sync()
+            await self.client.log(f"\tSynced {len(synced)} command(s).")
+        except discord.HTTPException as e:
+            await self.client.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
+        except discord.CommandSyncFailure as e:
+            await self.client.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
+        except discord.Forbidden as e:
+            await self.client.log(f'Invalid permissions for tree [GLOBAL]. {e}')
+
+        # Tries to sync tree commands for all guilds
+        for guild in self.client.guilds:
+            try:
+                await self.client.log(f'\tSyncing tree {guild.name} [{guild.id}].')
+                synced = await self.client.tree.sync(guild=guild)
+                await self.client.log(f"\tSynced {len(synced)} command(s).")
+            except discord.HTTPException:
+                await self.client.log(
+                    f'\tCouldn\'t sync tree {guild.name} [{guild.id}]'
+                )
+            except discord.Forbidden:
+                await self.client.log(
+                    f'Invalid permissions for tree {guild.name} [{guild.id}]'
+                )
+
+        await self.client.log(f"\tDone.")
+        await interaction.response.send_message(
+            'Done', ephemeral=True,
+        )
 
     @admin_group.command(
         name='fix',
@@ -135,6 +178,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         if not gamename:
             gamename = self.client.aux_vars['gameName']
 
+        self.client.clear()
         try:
             await self.client.change_presence(
                 activity=discord.Activity(
@@ -243,7 +287,13 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
 
 async def setup(client):
     server_id = client.aux_vars['admin_svr_id']
+    guild = await client.fetch_guild(int(server_id))
+    await client.log(f'Selected Guild ID for admin {server_id} [{guild.name}].')
     await client.add_cog(
-        AdminCog(client),
-        guild=discord.Object(id=server_id),
+        AdminCog(client, admin_guild=guild),
+        guild=guild,
     )
+
+    await client.log(f'\tSyncing tree {guild.name} [{guild.id}].')
+    synced = await client.tree.sync(guild=guild)
+    await client.log(f"\tSynced {len(synced)} command(s).")
