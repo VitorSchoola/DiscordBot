@@ -287,7 +287,7 @@ class MyClient(commands.Bot):
             await self.log(f'\tIt triggered a sound.')
 
             await self.log(f'\tOpening "{authorFile}".')
-            source = discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}')
+            source = discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}')
             source.read() # This will take some seconds
             
             try:

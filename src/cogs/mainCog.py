@@ -330,7 +330,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     async def playAudio(self, channel, file):
         """- Plays audio from path <file> into the <channel>;"""
         if (channel is not None):
-            source = discord.FFmpegPCMAudio(file)
+            source = discord.FFmpegOpusAudio(file)
             source.read() # This will take some seconds
 
             try:
