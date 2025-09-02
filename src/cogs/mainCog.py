@@ -7,6 +7,7 @@ import requests
 import datetime
 import math
 from typing import Optional
+import asyncio
 
 # Discord
 import discord
@@ -330,18 +331,18 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         """- Plays audio from path <file> into the <channel>;"""
         if (channel is not None):
             try:
-                voiceClient = await channel.connect()
+                voiceClient = await channel.connect(timeout=5)
             except Exception as e:
                 await self.client.log(
                     f"\tUnexpected error connecting to channel: [{e}]."
                 )
                 return
 
-            voiceClient.play(
-                discord.FFmpegOpusAudio(file),
-                after=lambda e: self.client.audioDisconnect(voiceClient),
-            )
+            await asyncio.sleep(1)
+
             await self.client.log(f'\tPlaying "{file}" inside channel.')
+            voiceClient.play(discord.FFmpegOpusAudio(file))
+            await self.client.audioDisconnect(voiceClient)
             return voiceClient
         else:
             await self.client.log(f"\tNo channel provided to connect.")

@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import asyncio
+import logging
 
 # Discord
 import discord
@@ -188,15 +189,13 @@ class MyClient(commands.Bot):
 
         return author
 
-    async def disconnectProperly(self, voiceClient):
-        await voiceClient.disconnect()
-        voiceClient.cleanup()
-
-    def audioDisconnect(self, voiceClient):
+    async def audioDisconnect(self, voiceClient):
         # Function to async disconnect from voiceClient
-        coro = self.disconnectProperly(voiceClient)
-        fut = asyncio.run_coroutine_threadsafe(coro, self.loop)
-        fut.result()
+        while voiceClient.is_playing():
+            await asyncio.sleep(1)
+        await self.log(f'\tAudio playback ended. Disconnecting')
+
+        await voiceClient.disconnect()
 
     def checkForAudio(self, audioname, check_db, audioFolder=""):
         # Checks if audio is downloaded in bot folder
@@ -244,6 +243,25 @@ class MyClient(commands.Bot):
 
         return None
 
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        """
+        Global error handler for commands.
+        """
+        # Unwrap the original error if it's a CommandInvokeError
+        if isinstance(error, commands.CommandInvokeError):
+            error = error.original
+
+        if isinstance(error, commands.MissingRequiredArgument):
+            await self.log(f"You're missing a required argument: `{error.param.name}`")
+        elif isinstance(error, commands.MissingPermissions):
+            await self.log("You don't have the necessary permissions to run this command.")
+        elif isinstance(error, commands.BadArgument):
+            await self.log("Invalid argument provided.")
+        elif isinstance(error, commands.CommandNotFound):
+            pass
+        else:
+            await self.log(f"An unexpected error occurred: `{error}`")
+
     # Event on_voice_state_update
     async def on_voice_state_update(self, member, before, after):
         authorFile = f'{str(member.id)}.mp3'
@@ -269,22 +287,29 @@ class MyClient(commands.Bot):
             await self.log(f'\tIt triggered a sound.')
 
             try:
-                voiceClient = await after.channel.connect(timeout=5, reconnect=False, self_deaf=True)
+                voiceClient = await after.channel.connect(timeout=5)
             except Exception as e:
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
-            voiceClient.play(
-                discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}'),
-                after=lambda _: self.audioDisconnect(voiceClient),
-            )
+            await asyncio.sleep(1)
 
             await self.log(f'\tOpening "{authorFile}".')
+
+            voiceClient.play(discord.FFmpegOpusAudio(f'Audio/Users/{authorFile}'))
+
+            await self.audioDisconnect(voiceClient)
 
 
 def main():
     client = MyClient()
-    client.run(os.environ.get('token'), log_handler=None)
+
+    # handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+
+    client.run(os.environ.get('token'), log_handler=handler, log_level=logging.ERROR)
 
 
 if __name__ == '__main__':
