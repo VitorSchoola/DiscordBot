@@ -1,4 +1,4 @@
-FROM python:3.10.8
+FROM python:3.11.9
 
 RUN apt-get -y update
 RUN apt-get -y upgrade
