@@ -286,15 +286,16 @@ class MyClient(commands.Bot):
                 return
             await self.log(f'\tIt triggered a sound.')
 
+            await self.log(f'\tOpening "{authorFile}".')
+            source = discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}')
+            source.read() # This will take some seconds
+            
             try:
                 voiceClient = await after.channel.connect(timeout=5)
             except Exception as e:
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
-            await self.log(f'\tOpening "{authorFile}".')
-            source = discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}')
-            source.read() # This will take some seconds
             voiceClient.play(source)
 
             await self.audioDisconnect(voiceClient)

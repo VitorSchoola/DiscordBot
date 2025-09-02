@@ -330,6 +330,9 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
     async def playAudio(self, channel, file):
         """- Plays audio from path <file> into the <channel>;"""
         if (channel is not None):
+            source = discord.FFmpegPCMAudio(file)
+            source.read() # This will take some seconds
+
             try:
                 voiceClient = await channel.connect(timeout=5)
             except Exception as e:
@@ -338,11 +341,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 )
                 return
 
-            await asyncio.sleep(1)
-
             await self.client.log(f'\tPlaying "{file}" inside channel.')
-            source = discord.FFmpegPCMAudio(file)
-            source.read() # This will take some seconds
             voiceClient.play(source)
             await self.client.audioDisconnect(voiceClient)
             return voiceClient
