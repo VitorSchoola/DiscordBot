@@ -1,4 +1,5 @@
 venv
+discord.log
 .env
 __pycache__	
 src/cogs/oldCogs/

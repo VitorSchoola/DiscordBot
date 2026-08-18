@@ -6,6 +6,8 @@ import os
 import sys
 import asyncio
 import datetime
+import io
+import subprocess
 
 # Discord
 import discord
@@ -28,51 +30,8 @@ if platform.system() == 'Windows':
 from dotenv import load_dotenv
 load_dotenv(encoding='latin-1')
 
-
 # Client class
 class MyClient(commands.Bot):
-    class Questionnaire(discord.ui.Modal):
-        def __init__(
-            self, on_submit_func, title='Basic Title',
-            items=[{'label': 'Name', 'placeholder': 'Your name here'}]
-        ):
-            super().__init__(
-                title=title,
-            )
-
-            self.callback_submit_func = on_submit_func
-
-            self.items = {}
-            for item in items:
-                self.items[item['variableName']] = discord.ui.TextInput(
-                    label=item['label'].capitalize(),
-                    placeholder=item['placeholder'],
-                    required=item['required'] if 'required' in item.keys()
-                    else False,
-                )
-
-                self.add_item(self.items[item['variableName']])
-
-        async def on_submit(
-            self, interaction: discord.Interaction
-        ):
-            items = self.items.items()
-            variables_values = {key: value.value for (key, value) in items}
-            await self.callback_submit_func(
-                author=interaction.user,
-                sendWith=interaction.response.send_message,
-                variables=variables_values
-            )
-
-        async def on_error(
-            self, error: Exception, interaction: discord.Interaction
-        ) -> None:
-            import traceback
-            await interaction.response.send_message(
-                'Oops! Something went wrong.', ephemeral=True
-            )
-            traceback.print_tb(error.__traceback__)
-
     # Enviroment variables and auxiliary variables
     def __init__(self, *args, **kwargs):
         intents = discord.Intents.default()
@@ -233,15 +192,13 @@ class MyClient(commands.Bot):
 
         return author
 
-    async def disconnectProperly(self, voiceClient):
-        await voiceClient.disconnect()
-        voiceClient.cleanup()
-
-    def audioDisconnect(self, voiceClient):
+    async def audioDisconnect(self, voiceClient):
         # Function to async disconnect from voiceClient
-        coro = self.disconnectProperly(voiceClient)
-        fut = asyncio.run_coroutine_threadsafe(coro, self.loop)
-        fut.result()
+        while voiceClient.is_playing():
+            await asyncio.sleep(1)
+        await self.log(f'\tAudio playback ended. Disconnecting')
+
+        await voiceClient.disconnect()
 
     def checkForAudio(self, audioname, check_db, audioFolder=""):
         # Checks if audio is downloaded in bot folder
@@ -289,11 +246,49 @@ class MyClient(commands.Bot):
 
         return None
 
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        """
+        Global error handler for commands.
+        """
+        # Unwrap the original error if it's a CommandInvokeError
+        if isinstance(error, commands.CommandInvokeError):
+            error = error.original
+
+        if isinstance(error, commands.MissingRequiredArgument):
+            await self.log(f"You're missing a required argument: `{error.param.name}`")
+        elif isinstance(error, commands.MissingPermissions):
+            await self.log("You don't have the necessary permissions to run this command.")
+        elif isinstance(error, commands.BadArgument):
+            await self.log("Invalid argument provided.")
+        elif isinstance(error, commands.CommandNotFound):
+            pass
+        else:
+            await self.log(f"An unexpected error occurred: `{error}`")
+
+    async def buffer_audio(self, path: str) -> io.BytesIO:
+        """Convert audio to opus in memory for fast playback (cross-platform)."""
+        def run_ffmpeg():
+            return subprocess.run(
+                ["ffmpeg", "-i", path, "-f", "opus", "pipe:1"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True
+            ).stdout
+
+        data = await asyncio.to_thread(run_ffmpeg)
+        return io.BytesIO(data)
+
     # Event on_voice_state_update
     async def on_voice_state_update(self, member, before, after):
         authorFile = f'{str(member.id)}.mp3'
 
         if (after.channel is not None and before.channel is None):
+            if member.id == self.user.id:
+                await self.log(
+                    f'\tI entered {str(after.channel)}.'
+                )
+                return
+
             await self.log(
                 f'{member.name} ({member.id}) entered {str(after.channel)}.'
             )
@@ -319,20 +314,21 @@ class MyClient(commands.Bot):
                 return
             await self.log(f'\tIt triggered a sound.')
 
+            await self.log(f'\tOpening "{authorFile}".')
+            # Pre-buffer the file in memory (async, non-blocking)
+            buf = await self.buffer_audio(f'Audio/Users/{authorFile}')
+            buf.seek(0)
+            source = discord.FFmpegOpusAudio(buf, pipe=True)
+            
             try:
-                voiceClient = await after.channel.connect(timeout=5.0)
-                # voiceClient = await member.voice.channel.connect(timeout=5.0)
+                voiceClient = await after.channel.connect(timeout=5)
             except Exception as e:
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
-            if voiceClient.is_connected():
-                voiceClient.play(
-                    discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}'),
-                    after=lambda _: self.audioDisconnect(voiceClient),
-                )
+            voiceClient.play(source)
 
-            await self.log(f'\tOpening "{authorFile}".')
+            await self.audioDisconnect(voiceClient)
 
 
 def main():
