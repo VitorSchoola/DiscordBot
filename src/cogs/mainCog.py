@@ -43,6 +43,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         super().__init__()
         self.client = client
 
+
     def handle_link(
         self, link: str,
         max_mb: int = 1, list_extensions=[],
@@ -91,6 +92,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         return (0, 'OK', nomeArq)
 
+
     # Image aux functions
     def wrap_text(self, text, width, font, maxLines=4):
         text_lines = []
@@ -119,6 +121,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             text_lines = text_lines[0:maxLines]
 
         return text_lines
+
 
     def createImage(self, imagePath, message1, fontSize1):
         # Creates Animal Crossing meme
@@ -183,6 +186,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         img.save('Img/Img_aux/Meme-out.jpg')
         return 'Img/Img_aux/Meme-out.jpg'
 
+
     def createImage2(self, imagePath, message1, fontSize1):
         # Creates Dota+ meme
         img = PIL.Image.open(imagePath)
@@ -227,6 +231,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         img.save('Img/Img_aux/Meme-out.jpg')
         return 'Img/Img_aux/Meme-out.jpg'
 
+
     # Audio aux functions
     def changePitchSeg(self, sound, speed=1.0):
         alt_sound = sound._spawn(sound.raw_data, overrides={
@@ -234,6 +239,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         })
 
         return alt_sound.set_frame_rate(sound.frame_rate)
+
 
     def changePitch(self, inFile, outFile, pitchchange):
         if (inFile[-4:] == '.mp3'):
@@ -251,6 +257,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             self.log('\tCropped due to audio being too long.')
         hipitch_sound[:10000].export(outFile, format="mp3")
 
+
     def applyWacky(self, inFile, outFile):
         audio = AudioSegment.from_mp3(inFile)
 
@@ -264,10 +271,12 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         newAudio.export(outFile, format="mp3")
 
+
     def applyReverse(self, inFile, outFile):
         sound = AudioSegment.from_mp3(inFile)
         sound = sound.reverse()
         sound.export(outFile, format="mp3")
+
 
     def authAudio(self, originalFile, fileName, limit, max_secs=5):
         # Authenticator for audio files.
@@ -288,6 +297,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         song.export(str(fileName), format="mp3")
         print('Done')
         return 0
+
 
     async def process_audio(
         self, interaction: discord.Interaction,
@@ -327,6 +337,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         return 0
 
+
     async def playAudio(self, channel, file):
         """- Plays audio from path <file> into the <channel>;"""
         if (channel is not None):
@@ -349,6 +360,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         else:
             await self.client.log(f"\tNo channel provided to connect.")
             return
+
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error):
@@ -411,6 +423,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                  f'Error message: {error}')
             )
 
+
     def parse_s(self, group_obj, com):
         aux_s = ''
 
@@ -431,6 +444,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                     aux_s += f'[{parameter.display_name}] '
         aux_s += f"- {com.description}\n"
         return aux_s
+
 
     async def how_to_use_group(
         self, interaction: discord.Interaction,
@@ -617,6 +631,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
                 f"\tNo command found"
             )
 
+
     @discord.app_commands.command(
         name='ping',
         description=('Shows how much time the bot takes to get '
@@ -710,6 +725,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         if os.path.exists(nomeArq):
             os.remove(nomeArq)
 
+
     @discord.app_commands.command(
         name='roll',
         description='Gets a random integer between <a> and [b].',
@@ -746,6 +762,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         await self.client.log(f"\tRolled {aleatorio}. ({smaller}~{bigger})")
 
+
     @discord.app_commands.command(
         name='loro',
         description='AI LORO!',
@@ -772,6 +789,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             embed=embed, ephemeral=False,
         )
         await self.client.log(f"\tDone.")
+
 
     @discord.app_commands.command(
         name='wolfram',
@@ -802,6 +820,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             await self.client.log(
                 f"\tI wasn't able to complete the request. [{e}]"
             )
+
 
     # IMAGE STANDALONE COMMANDS #
     @discord.app_commands.command(
@@ -834,6 +853,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         await self.client.log(f'\tDota image sent to user.')
         return
+
 
     @discord.app_commands.command(
         name='meme',
@@ -871,6 +891,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         await self.client.log(f'\tMeme image sent to user.')
         return 0
+
 
     @discord.app_commands.command(
         name='wiki',
@@ -929,6 +950,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
              f" Query was {term}."),
         )
 
+
     # DOG GROUP #
     dog_group = discord.app_commands.Group(
         name='dog',
@@ -964,6 +986,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         await self.client.log("\tDog list shown.")
         return
+
 
     @dog_group.command(
         name='search',
@@ -1028,6 +1051,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log("\tDog shown.")
         return
 
+
     # CAT GROUP #
     cat_group = discord.app_commands.Group(
         name='cat',
@@ -1061,6 +1085,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         await self.client.log("\tCat list shown.")
         return
+
 
     @cat_group.command(
         name='search',
@@ -1133,6 +1158,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log("\tCat shown.")
         return
 
+
     # STANDALONE AUDIO FUNCIONS #
 
     @discord.app_commands.command(
@@ -1184,6 +1210,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await interaction.followup.send(
             'Playing audio', ephemeral=True,
         )
+
 
     @discord.app_commands.command(
         name='cebolinha',
@@ -1241,6 +1268,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             'Playing audio', ephemeral=True,
         )
 
+
     # AUDIO GROUP #
     audio_group = discord.app_commands.Group(
         name='audio',
@@ -1279,6 +1307,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             ephemeral=hidden,
         )
         await self.client.log(f"\tDone.")
+
 
     @audio_group.command(
         name='info',
@@ -1340,6 +1369,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             await interaction.followup.send(
                 'No audio found', ephemeral=hidden,
             )
+
 
     @audio_group.command(
         name='change',
@@ -1458,6 +1488,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             await self.client.log("\tDone")
             return
 
+
     @audio_group.command(
         name='remove',
         description='Removes audio played when you enter a voice channel 😔',
@@ -1487,6 +1518,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             await self.client.log("\tRemoved successfully.")
             return
+
 
     @audio_group.command(
         name='add',
@@ -1611,6 +1643,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             )
             return
 
+
     @audio_group.command(
         name='delete',
         description='Removes audio from out database',
@@ -1659,6 +1692,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             await interaction.followup.send("Done!")
             await self.client.log(f'\tDone. Removed {nameFile}')
 
+
     @audio_group.command(
         name='play',
         description=('Plays audio on connected voice channel.'
@@ -1693,7 +1727,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             random = True
 
         # Gets channel
-        channel = self.client.get_channel(interaction)
+        channel = interaction.user.voice.channel
         if (channel is None):
             await interaction.followup.send(
                 "You're not in a voice channel.",
@@ -1785,6 +1819,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             'Done!', ephemeral=True,
         )
         await self.client.log('\tDone!')
+
 
     # TTS GROUP #
     tts_group = discord.app_commands.Group(
@@ -1887,6 +1922,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             f'{"[Assuming language]"*approx_lang} Playing audio in {language}',
             ephemeral=True,
         )
+
 
     @tts_group.command(
         name='translate',
@@ -2050,6 +2086,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         )
         await self.client.log(f'\tDone!')
 
+
     # STANDALONE COUNT FUNCTIONS #
     @discord.app_commands.command(
         name='panda',
@@ -2093,6 +2130,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             embed=embed,
         )
         await self.client.log(f"\tDone!")
+
 
     @discord.app_commands.command(
         name='god',
@@ -2140,6 +2178,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
 
         await self.client.log(f"\tDone.")
 
+
     # COUNT GROUP #
     count_group = discord.app_commands.Group(
         name='count',
@@ -2182,6 +2221,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
         await self.client.log(
             f"\tCounter [{variable.capitalize()}]: {counter}"
         )
+
 
     @count_group.command(
         name='add',
@@ -2228,6 +2268,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             f"\tCounter [{variable.capitalize()}]: {counter}"
         )
 
+
     @count_group.command(
         name='set',
         description='Sets <number> points to the variable',
@@ -2273,6 +2314,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             f"\tCounter [{str(variable).capitalize()}]: {counter}"
         )
 
+
     # CURRENCY GROUP #
     currency_group = discord.app_commands.Group(
         name='currency',
@@ -2308,6 +2350,7 @@ class MainCog(commands.Cog, name='Commands', command_attrs=dict(hidden=False)):
             ephemeral=True,
         )
         await self.client.log('Done!')
+
 
     @currency_group.command(
         name='convert',
