@@ -1,12 +1,12 @@
 FROM python:3.11.9
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get install -y ffmpeg
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /bot
-COPY requirements.txt /bot/
-RUN pip install -r requirements.txt
-COPY . /bot
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
 
-CMD python src
+CMD ["python", "-m", "src"]

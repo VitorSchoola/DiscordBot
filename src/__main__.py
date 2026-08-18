@@ -4,9 +4,8 @@
 # Native libraries
 import os
 import sys
-import time
 import asyncio
-import logging
+import datetime
 import io
 import subprocess
 
@@ -117,6 +116,8 @@ class MyClient(commands.Bot):
             self.dbs['db_audios']
         )
 
+        self.aux_vars['voice_cooldowns'] = {}
+
     async def setup_hook(self):
         """Loads every cog necessary"""
         await self.log(f'Initializing MainCog.')
@@ -125,7 +126,7 @@ class MyClient(commands.Bot):
         await self.load_extension("cogs.adminCog")
 
     async def on_ready(self):
-        horario = {time.strftime('%d/%m/%Y - %H:%M:%S')}
+        horario = {datetime.datetime.utcnow()}
         stringS = ("\n_________________New session "
                    f"({horario})_________________\n")
         stringS += f"\tUser Name: {str(self.user.name)}\n"
@@ -155,21 +156,21 @@ class MyClient(commands.Bot):
 
     async def log(self, message, printMessage=True):
         with open('log.txt', "a", encoding="utf-8") as file:
-            file.write(f"[LOG]({time.strftime('%d/%m/%Y - %H:%M:%S')}): ")
+            file.write(f"[LOG]({datetime.datetime.utcnow()}): ")
             file.write(f"{message}\n")
 
         if (printMessage):
             try:
                 print(
                     (f'[LOG]'
-                     f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
+                     f'({datetime.datetime.utcnow()}): '
                      f'[{message}].'),
                     file=sys.stderr,
                 )
             except Exception as e:
                 print(
                     (f'[EXCEPTION ON PRINT]'
-                     f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
+                     f'({datetime.datetime.utcnow()}): '
                      f'[{e}].'),
                     file=sys.stderr,
                 )
@@ -292,6 +293,18 @@ class MyClient(commands.Bot):
                 f'{member.name} ({member.id}) entered {str(after.channel)}.'
             )
 
+            cooldown_key = f'{member.id}_{authorFile}'
+            now = datetime.datetime.utcnow()
+            if cooldown_key in self.aux_vars['voice_cooldowns']:
+                elapsed = (now - self.aux_vars['voice_cooldowns'][cooldown_key]).total_seconds()
+                if elapsed < 300:  # 5 minutos de cooldown
+                    await self.log(
+                        f'\tCooldown active. '
+                        f'{int(300 - elapsed)}s remaining.'
+                    )
+                    return
+            self.aux_vars['voice_cooldowns'][cooldown_key] = now
+
             dont_have = not self.checkForAudio(
                 audioname=authorFile, check_db=self.dbs['db_users'],
                 audioFolder='Users/'
@@ -319,14 +332,11 @@ class MyClient(commands.Bot):
 
 
 def main():
+    import logging
+    handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+
     client = MyClient()
-
-    # handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-
-    client.run(os.environ.get('token'), log_handler=handler, log_level=logging.ERROR)
+    client.run(os.environ.get('token'), log_handler=handler, root_logger=True, log_level=logging.DEBUG)
 
 
 if __name__ == '__main__':
