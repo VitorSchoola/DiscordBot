@@ -4,8 +4,8 @@
 # Native libraries
 import os
 import sys
-import time
 import asyncio
+import datetime
 
 # Discord
 import discord
@@ -157,6 +157,8 @@ class MyClient(commands.Bot):
             self.dbs['db_audios']
         )
 
+        self.aux_vars['voice_cooldowns'] = {}
+
     async def setup_hook(self):
         """Loads every cog necessary"""
         await self.log(f'Initializing MainCog.')
@@ -165,7 +167,7 @@ class MyClient(commands.Bot):
         await self.load_extension("cogs.adminCog")
 
     async def on_ready(self):
-        horario = {time.strftime('%d/%m/%Y - %H:%M:%S')}
+        horario = {datetime.datetime.utcnow()}
         stringS = ("\n_________________New session "
                    f"({horario})_________________\n")
         stringS += f"\tUser Name: {str(self.user.name)}\n"
@@ -173,30 +175,6 @@ class MyClient(commands.Bot):
         stringS += ("_________________________________"
                     "_________________________________")
         await self.log(stringS)
-
-        try:
-            await self.log('\tSyncing tree [GLOBAL].')
-            await self.tree.sync()
-        except discord.HTTPException as e:
-            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
-        except discord.CommandSyncFailure as e:
-            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
-        except discord.Forbidden as e:
-            await self.log(f'Invalid permissions for tree [GLOBAL]. {e}')
-
-        # Tries to sync tree commands for all guilds on startup
-        for guild in self.guilds:
-            try:
-                await self.log(f'\tSyncing tree {guild.name} [{guild.id}].')
-                await self.tree.sync(guild=guild)
-            except discord.HTTPException:
-                await self.log(
-                    f'\tCouldn\'t sync tree {guild.name} [{guild.id}]'
-                )
-            except discord.Forbidden:
-                await self.log(
-                    f'Invalid permissions for tree {guild.name} [{guild.id}]'
-                )
 
         await self.change_presence(
             activity=discord.Activity(
@@ -219,21 +197,21 @@ class MyClient(commands.Bot):
 
     async def log(self, message, printMessage=True):
         with open('log.txt', "a", encoding="utf-8") as file:
-            file.write(f"[LOG]({time.strftime('%d/%m/%Y - %H:%M:%S')}): ")
+            file.write(f"[LOG]({datetime.datetime.utcnow()}): ")
             file.write(f"{message}\n")
 
         if (printMessage):
             try:
                 print(
                     (f'[LOG]'
-                     f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
+                     f'({datetime.datetime.utcnow()}): '
                      f'[{message}].'),
                     file=sys.stderr,
                 )
             except Exception as e:
                 print(
                     (f'[EXCEPTION ON PRINT]'
-                     f'({time.strftime("%d/%m/%Y - %H:%M:%S")}): '
+                     f'({datetime.datetime.utcnow()}): '
                      f'[{e}].'),
                     file=sys.stderr,
                 )
@@ -320,6 +298,18 @@ class MyClient(commands.Bot):
                 f'{member.name} ({member.id}) entered {str(after.channel)}.'
             )
 
+            cooldown_key = f'{member.id}_{authorFile}'
+            now = datetime.datetime.utcnow()
+            if cooldown_key in self.aux_vars['voice_cooldowns']:
+                elapsed = (now - self.aux_vars['voice_cooldowns'][cooldown_key]).total_seconds()
+                if elapsed < 300:  # 5 minutos de cooldown
+                    await self.log(
+                        f'\tCooldown active. '
+                        f'{int(300 - elapsed)}s remaining.'
+                    )
+                    return
+            self.aux_vars['voice_cooldowns'][cooldown_key] = now
+
             dont_have = not self.checkForAudio(
                 audioname=authorFile, check_db=self.dbs['db_users'],
                 audioFolder='Users/'
@@ -330,22 +320,27 @@ class MyClient(commands.Bot):
             await self.log(f'\tIt triggered a sound.')
 
             try:
-                voiceClient = await after.channel.connect()
+                voiceClient = await after.channel.connect(timeout=5.0)
+                # voiceClient = await member.voice.channel.connect(timeout=5.0)
             except Exception as e:
                 await self.log(f"\tRaised exception. [{e}]")
                 return
 
-            voiceClient.play(
-                discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}'),
-                after=lambda _: self.audioDisconnect(voiceClient),
-            )
+            if voiceClient.is_connected():
+                voiceClient.play(
+                    discord.FFmpegPCMAudio(f'Audio/Users/{authorFile}'),
+                    after=lambda _: self.audioDisconnect(voiceClient),
+                )
 
             await self.log(f'\tOpening "{authorFile}".')
 
 
 def main():
+    import logging
+    handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+
     client = MyClient()
-    client.run(os.environ.get('token'), log_handler=None)
+    client.run(os.environ.get('token'), log_handler=handler, root_logger=True, log_level=logging.DEBUG)
 
 
 if __name__ == '__main__':

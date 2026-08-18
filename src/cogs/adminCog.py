@@ -9,6 +9,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         super().__init__()
         self.client = client
 
+
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error):
         """A cog Error Handler for our commands."""
@@ -75,6 +76,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         description=('Admin group commands. Send /help admin for help.'),
     )
 
+
     # ADMIN COMMANDS #
     @admin_group.command(
         name='getlog',
@@ -96,6 +98,49 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
             )
         await self.client.log(f'\tDone!')
 
+
+    @admin_group.command(
+        name='updatelinks',
+        description='Update links in servers',
+    )
+    @discord.app_commands.describe(
+    )
+    async def update_links_func(self, interaction: discord.Interaction):
+        await self.client.log_command_call(interaction)
+
+        if not (await self.client.validate_admin(interaction)):
+            await self.client.log('\tAccess denied.')
+            return
+
+        try:
+            await self.log('\tSyncing tree [GLOBAL].')
+            await self.tree.sync()
+        except discord.HTTPException as e:
+            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
+        except discord.CommandSyncFailure as e:
+            await self.log(f'\tCouldn\'t sync tree [GLOBAL]. {e}')
+        except discord.Forbidden as e:
+            await self.log(f'Invalid permissions for tree [GLOBAL]. {e}')
+
+        # Tries to sync tree commands for all guilds on startup
+        for guild in self.guilds:
+            try:
+                await self.log(f'\tSyncing tree {guild.name} [{guild.id}].')
+                await self.tree.sync(guild=guild)
+            except discord.HTTPException:
+                await self.log(
+                    f'\tCouldn\'t sync tree {guild.name} [{guild.id}]'
+                )
+            except discord.Forbidden:
+                await self.log(
+                    f'Invalid permissions for tree {guild.name} [{guild.id}]'
+                )
+
+        await interaction.response.send_message(
+            f'Done!', ephemeral=True,
+        )
+
+
     @admin_group.command(
         name='close',
         description='Closes bot',
@@ -111,9 +156,10 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
 
         await self.client.log('\tGoodbye!')
         await interaction.response.send_message(
-            f'\tGoodbye!.', ephemeral=True,
+            f'Goodbye!.', ephemeral=True,
         )
         await self.client.close(-1)
+
 
     @admin_group.command(
         name='fix',
@@ -163,6 +209,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
                 f'\tUnknown error [{e}].', ephemeral=True,
             )
 
+
     @admin_group.command(
         name='profile',
         description='Changes bot nickname',
@@ -193,6 +240,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
                 f'\tUnknown error [{e}].', ephemeral=True,
             )
 
+
     @admin_group.command(
         name='cmon',
         description='Calls bot to current channel'
@@ -216,6 +264,7 @@ class AdminCog(commands.Cog, name='AdminCog', command_attrs=dict(hidden=True)):
         await interaction.response.send_message(
             'Done', ephemeral=True,
         )
+
 
     @admin_group.command(
         name='gtfo',
