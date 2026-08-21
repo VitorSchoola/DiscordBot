@@ -293,7 +293,7 @@ class MyClient(commands.Bot):
                 f'{member.name} ({member.id}) entered {str(after.channel)}.'
             )
 
-            cooldown_key = f'{member.id}_{authorFile}'
+            cooldown_key = f'{member.id}_{after.channel.id}_{authorFile}'
             now = datetime.datetime.utcnow()
             if cooldown_key in self.aux_vars['voice_cooldowns']:
                 elapsed = (now - self.aux_vars['voice_cooldowns'][cooldown_key]).total_seconds()
@@ -303,7 +303,6 @@ class MyClient(commands.Bot):
                         f'{int(300 - elapsed)}s remaining.'
                     )
                     return
-            self.aux_vars['voice_cooldowns'][cooldown_key] = now
 
             dont_have = not self.checkForAudio(
                 audioname=authorFile, check_db=self.dbs['db_users'],
@@ -329,6 +328,10 @@ class MyClient(commands.Bot):
             voiceClient.play(source)
 
             await self.audioDisconnect(voiceClient)
+
+        elif (after.channel is None and before.channel is not None):
+            cooldown_key = f'{member.id}_{before.channel.id}_{authorFile}'
+            self.aux_vars['voice_cooldowns'][cooldown_key] = datetime.datetime.utcnow()
 
 
 def main():
